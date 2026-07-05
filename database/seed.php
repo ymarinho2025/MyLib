@@ -1,0 +1,25 @@
+<?php
+require __DIR__ . '/../vendor/autoload.php';
+use Dotenv\Dotenv; use App\Core\Database;
+if (file_exists(dirname(__DIR__).'/.env')) Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+$pdo=Database::connection();
+function slugify($s){ $s=iconv('UTF-8','ASCII//TRANSLIT',$s); $s=strtolower(preg_replace('/[^a-z0-9]+/','-', $s)); return trim($s,'-'); }
+$genres=['Literatura Psicológica','Literatura Filosófica e Existencialista','Literatura Social e Realista','Literatura Familiar','Literatura Histórica','Literatura Gótica e Horror Sobrenatural','Sátira e Fantástico','Romance Sentimental','Teatro Clássico','Poesia Épica','Distopia','Filosofia','Estratégia Militar','Psicologia, Persuasão e Comportamento Humano','Romance Policial (True Crime)','Fantasia Épica'];
+$books=[
+['Literatura Psicológica','Fiódor Dostoiévski','Crime e Castigo'],['Literatura Psicológica','Fiódor Dostoiévski','O Idiota'],['Literatura Psicológica','Fiódor Dostoiévski','Memórias do Subsolo'],['Literatura Psicológica','Fiódor Dostoiévski','Noites Brancas'],['Literatura Psicológica','Fiódor Dostoiévski','O Jogador'],['Literatura Psicológica','Sylvia Plath','A Redoma de Vidro'],['Literatura Psicológica','Osamu Dazai','Declínio de um Homem','No Longer Human'],['Literatura Psicológica','Anton Tchékhov','Pavilhão nº 6'],['Literatura Psicológica','John Williams','Stoner'],
+['Literatura Filosófica e Existencialista','Fiódor Dostoiévski','Os Irmãos Karamázov'],['Literatura Filosófica e Existencialista','Franz Kafka','O Processo'],['Literatura Filosófica e Existencialista','Franz Kafka','O Castelo'],['Literatura Filosófica e Existencialista','Franz Kafka','A Metamorfose'],['Literatura Filosófica e Existencialista','Franz Kafka','Carta ao Pai'],['Literatura Filosófica e Existencialista','Franz Kafka','América'],['Literatura Filosófica e Existencialista','Albert Camus','O Estrangeiro'],['Literatura Filosófica e Existencialista','Albert Camus','O Mal-Entendido'],['Literatura Filosófica e Existencialista','Liev Tolstói','Ressurreição'],['Literatura Filosófica e Existencialista','Liev Tolstói','A Morte de Ivan Ilitch'],['Literatura Filosófica e Existencialista','Cormac McCarthy','A Estrada','The Road'],
+['Literatura Social e Realista','Fiódor Dostoiévski','Gente Pobre'],['Literatura Social e Realista','Nikolai Gógol','O Capote'],['Literatura Social e Realista','Aleksandr Kuprin','Yama: O Fosso'],['Literatura Social e Realista','Graciliano Ramos','Vidas Secas'],['Literatura Social e Realista','Ivan Turguêniev','Mumu'],['Literatura Social e Realista','James Baldwin','O Quarto de Giovanni',"Giovanni's Room"],
+['Literatura Familiar','Liev Tolstói','Anna Kariênina'],['Literatura Familiar','Ivan Turguêniev','Pais e Filhos'],
+['Literatura Histórica','Liev Tolstói','Guerra e Paz'],['Literatura Histórica','Kristin Hannah','O Rouxinol','The Nightingale'],['Literatura Histórica','Kristin Hannah','Os Quatro Ventos','The Four Winds'],
+['Literatura Gótica e Horror Sobrenatural','Nikolai Gógol','Viy'],['Sátira e Fantástico','Nikolai Gógol','Almas Mortas'],['Romance Sentimental','Nikolai Karamzin','Pobre Liza'],['Teatro Clássico','William Shakespeare','Hamlet'],['Poesia Épica','John Milton','Paraíso Perdido'],
+['Distopia','George Orwell','1984'],['Distopia','George Orwell','A Revolução dos Bichos'],['Distopia','Aldous Huxley','Admirável Mundo Novo'],
+['Filosofia','Jean-Jacques Rousseau','Confissões'],['Filosofia','Nicolau Maquiavel','O Príncipe'],['Estratégia Militar','Sun Tzu','A Arte da Guerra'],
+['Psicologia, Persuasão e Comportamento Humano','Robert Greene','As 48 Leis do Poder'],['Psicologia, Persuasão e Comportamento Humano','Robert Greene','As Leis da Natureza Humana'],['Psicologia, Persuasão e Comportamento Humano','Jack Schafer e Marvin Karlins','Manual de Persuasão do FBI'],['Psicologia, Persuasão e Comportamento Humano','Joe Navarro','O Que Todo Corpo Fala'],
+['Romance Policial (True Crime)','Ilana Casoy','O Quinto Mandamento','caso Elize Matsunaga'],['Fantasia Épica','J. K. Rowling','Harry Potter (coleção)'],['Fantasia Épica','George R. R. Martin','As Crônicas de Gelo e Fogo (coleção)']
+];
+$pdo->beginTransaction();
+$gids=[]; $st=$pdo->prepare('INSERT IGNORE INTO genres(name,slug,description) VALUES(?,?,?)'); foreach($genres as $g){$st->execute([$g,slugify($g),'Categoria da Biblioteca de Yuri Marinho']); $id=$pdo->prepare('SELECT id FROM genres WHERE name=?');$id->execute([$g]);$gids[$g]=$id->fetch()['id'];}
+$aids=[]; $ai=$pdo->prepare('INSERT IGNORE INTO authors(name) VALUES(?)'); foreach($books as $b){$author=$b[1]; if(!isset($aids[$author])){$ai->execute([$author]);$q=$pdo->prepare('SELECT id FROM authors WHERE name=?');$q->execute([$author]);$aids[$author]=$q->fetch()['id'];}}
+$bi=$pdo->prepare('INSERT IGNORE INTO books(title,original_title,author_id,genre_id,description,created_at) VALUES(?,?,?,?,?,NOW())'); foreach($books as $b){$bi->execute([$b[2],$b[3]??null,$aids[$b[1]],$gids[$b[0]],'Livro do catálogo inicial da Biblioteca de Yuri Marinho.']);}
+$pdo->commit();
+echo "Seed concluído com ".count($books)." livros.\n";
