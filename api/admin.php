@@ -1,0 +1,1 @@
+<?php ?><!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Admin MyLib</title><link rel="stylesheet" href="/css/style.css"></head><body><main class="wrap"><h1>Admin</h1><p>Rode <code>/migrate.php</code> para criar tabelas e inserir livros.</p></main></body></html>

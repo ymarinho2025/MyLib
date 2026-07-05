@@ -1,0 +1,1 @@
+<?php ?><!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Home - MyLib</title><link rel="stylesheet" href="/css/style.css"></head><body><main class="wrap"><h1>Minha Biblioteca</h1><p>Adicione livros, altere status, avalie e ordene sua preferência.</p><section id="books"></section></main><script src="/js/app.js"></script></body></html>

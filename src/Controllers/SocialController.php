@@ -1,0 +1,9 @@
+<?php
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/login/jwt.php';
+class SocialController {
+    public static function follow(): void { require_method('POST'); $uid=auth_user_id(); $d=input_json(); $fid=(int)($d['user_id']??0); if($uid===$fid) json_response(['error'=>'Não é possível seguir a si mesmo.'],422); $s=db()->prepare('INSERT INTO follows(follower_id, following_id) VALUES(?,?) ON CONFLICT DO NOTHING'); $s->execute([$uid,$fid]); json_response(['ok'=>true]); }
+    public static function unfollow(): void { require_method('POST'); $uid=auth_user_id(); $d=input_json(); $fid=(int)($d['user_id']??0); $s=db()->prepare('DELETE FROM follows WHERE follower_id=? AND following_id=?'); $s->execute([$uid,$fid]); json_response(['ok'=>true]); }
+    public static function feed(): void { $uid=auth_user_id(); $s=db()->prepare('SELECT u.name,u.username,b.title,a.name author,g.name genre,ub.status,ub.notes,ub.rating,ub.updated_at FROM user_books ub JOIN follows f ON f.following_id=ub.user_id JOIN users u ON u.id=ub.user_id JOIN books b ON b.id=ub.book_id JOIN authors a ON a.id=b.author_id JOIN genres g ON g.id=b.genre_id WHERE f.follower_id=? ORDER BY ub.updated_at DESC LIMIT 50'); $s->execute([$uid]); json_response(['feed'=>$s->fetchAll()]); }
+    public static function gift(): void { require_method('POST'); $from=auth_user_id(); $d=input_json(); $to=(int)($d['to_user_id']??0); $book=(int)($d['book_id']??0); $amount=$d['amount']??null; $s=db()->prepare('INSERT INTO gifts(from_user_id,to_user_id,book_id,amount,message) VALUES(?,?,?,?,?) RETURNING *'); $s->execute([$from,$to,$book,$amount,$d['message']??null]); $pix=db()->prepare('SELECT pix_key_type,pix_key FROM users WHERE id=?'); $pix->execute([$to]); json_response(['gift'=>$s->fetch(),'receiver_pix'=>$pix->fetch()],201); }
+}

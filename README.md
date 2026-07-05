@@ -1,125 +1,87 @@
-# Biblioteca de Yuri Marinho — PHP completo
+# MyLib — padrão PHP-web-app
 
-Backend em PHP seguindo a lógica de projeto com `api`, `public`, `src/Controllers`, `src/Core`, Composer, JWT e banco MySQL.
+Projeto reorganizado para seguir a lógica do repositório `ymarinho2025/PHP-web-app`:
 
-## O que foi implementado
+- `api/*.php`: páginas e endpoints PHP públicos.
+- `public/css` e `public/js`: arquivos estáticos.
+- `src/Controllers`: regras de negócio, conexão e controllers.
+- `composer.json`: dependência `firebase/php-jwt`.
+- `vercel.json`: rotas no mesmo formato do PHP-web-app.
 
-- Login por e-mail ou `@username`.
-- Cadastro com validação de username.
-- Senha com `password_hash`/bcrypt.
-- JWT com `firebase/php-jwt`.
-- Perfis públicos com `@username`.
-- Catálogo separado da biblioteca pessoal.
-- Tabelas relacionais: usuários, autores, gêneros, séries e livros.
-- Biblioteca individual por usuário.
-- Status dos livros:
-  - `READ` — lido
-  - `READING` — lendo
-  - `NEXT_READ` — próxima leitura
-  - `WANT_FUTURE` — desejo ter futuramente
-  - `DUSTY` — pegando poeira
-  - `GIFT_ACCEPTED` — aceito presente
-  - `ABANDONED` — abandonei
-  - `REREADING` — relendo
-  - `WANT_SPECIAL_EDITION` — quero edição especial
-- Ordenação personalizada com `display_order`.
-- Notas pessoais, avaliação e favorito.
-- Seguidores.
-- Feed dos usuários seguidos.
-- Curtida em perfil.
-- Comentários em livros.
-- Aba Pix com cadastro de chave.
-- Presentes via Pix: registro de intenção de pagamento e retorno da chave Pix cadastrada pelo destinatário.
-- Seed com a biblioteca atualizada, incluindo autores, gêneros e 49 livros.
-
-## Instalação
+## Instalação local sem Apache
 
 ```bash
-cd biblioteca-yuri-php-completo
 composer install
 cp .env.example .env
+php -S localhost:8000 -t api
 ```
 
-Crie um banco MySQL chamado `biblioteca_yuri` e configure o `.env`.
-
-Rode a migration:
-
-```bash
-mysql -u root -p biblioteca_yuri < database/migration.sql
-```
-
-Rode o seed:
-
-```bash
-composer seed
-```
-
-Inicie o servidor:
-
-```bash
-composer start
-```
-
-API:
+Acesse:
 
 ```text
-http://localhost:8000/api
+http://localhost:8000
 ```
 
-Frontend estático:
+## NeonDB
 
-Abra os arquivos em `frontend/` no navegador ou sirva a pasta com Live Server.
+No `.env`, coloque sua URL:
+
+```env
+DATABASE_URL="postgresql://usuario:senha@host/neondb?sslmode=require"
+JWT_SECRET="troque_por_uma_chave_grande"
+```
+
+## Criar tabelas e inserir biblioteca
+
+Pelo navegador:
+
+```text
+http://localhost:8000/migrate.php
+```
+
+Ou pelo terminal:
+
+```bash
+php src/Controllers/migrate.php
+```
 
 ## Rotas principais
 
-### Auth
+### Páginas
 
-```text
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/me
+- `/index.php`
+- `/login-page.php`
+- `/cadastro.php`
+- `/home.php`
+- `/explorar.php`
+- `/admin.php`
+
+### API
+
+- `POST /register.php`
+- `POST /login.php`
+- `GET /me.php`
+- `GET /books.php?q=`
+- `POST /add-book.php`
+- `POST /update-book.php`
+- `POST /comment.php`
+- `GET /users.php?q=`
+- `GET /profile.php?username=yuri`
+- `POST /update-profile.php`
+- `POST /pix.php`
+- `POST /follow.php`
+- `POST /unfollow.php`
+- `GET /feed.php`
+- `POST /gift.php`
+
+## Comandos para subir no GitHub
+
+```bash
+git clone https://github.com/ymarinho2025/MyLib.git
+cd MyLib
+# copie os arquivos desta pasta para dentro do repositório
+composer install
+git add .
+git commit -m "Reorganiza MyLib no padrão PHP-web-app"
+git push origin main
 ```
-
-### Usuários
-
-```text
-GET  /api/users?q=
-GET  /api/users/{username}
-PUT  /api/users/profile
-POST /api/users/{id}/like
-POST /api/follow/{id}
-DELETE /api/follow/{id}
-```
-
-### Feed
-
-```text
-GET /api/feed
-```
-
-### Livros
-
-```text
-GET    /api/books?q=&title=&author=&genre=
-GET    /api/books/{id}
-POST   /api/books
-GET    /api/books/categories
-GET    /api/books/authors
-POST   /api/books/{bookId}/add
-PUT    /api/user-books/{bookId}
-DELETE /api/user-books/{bookId}
-PUT    /api/user-books/reorder
-POST   /api/books/{bookId}/comments
-```
-
-### Pix e presentes
-
-```text
-GET  /api/pix/key
-POST /api/pix/key
-POST /api/pix/gift/{bookId}
-```
-
-## Observação sobre Pix
-
-Esta versão não realiza transferência financeira real. Ela salva a chave Pix do usuário e cria um registro de presente pendente. Para produção, integre com um PSP/banco autorizado, como Gerencianet/Efi, Mercado Pago, Banco do Brasil, Asaas, OpenPix ou outro provedor Pix.

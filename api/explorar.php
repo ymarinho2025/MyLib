@@ -1,0 +1,1 @@
+<?php ?><!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Explorar - MyLib</title><link rel="stylesheet" href="/css/style.css"></head><body><main class="wrap"><h1>Explorar Usuários</h1><input id="searchUsers" placeholder="Buscar por nome ou @username"><section id="users"></section></main><script src="/js/app.js"></script></body></html>

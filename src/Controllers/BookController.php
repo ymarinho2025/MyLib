@@ -1,19 +1,39 @@
 <?php
-namespace App\Controllers;
-use App\Core\{Database,Request,Response}; use App\Middlewares\AuthMiddleware;
-final class BookController {
-  public static array $statuses=['READ','READING','NEXT_READ','WANT_FUTURE','DUSTY','GIFT_ACCEPTED','ABANDONED','REREADING','WANT_SPECIAL_EDITION'];
-  public static function catalog(): void { $q=Request::query(); $sql='SELECT b.*,a.name author,g.name genre FROM books b JOIN authors a ON a.id=b.author_id JOIN genres g ON g.id=b.genre_id WHERE 1=1'; $params=[];
-    foreach(['title'=>'b.title','author'=>'a.name','genre'=>'g.name'] as $k=>$col){ if(!empty($q[$k])){$sql.=" AND $col LIKE ?";$params[]='%'.$q[$k].'%';}}
-    if(!empty($q['q'])){$sql.=' AND (b.title LIKE ? OR a.name LIKE ? OR g.name LIKE ?)';$params=array_merge($params,array_fill(0,3,'%'.$q['q'].'%'));}
-    $sql.=' ORDER BY g.name,a.name,b.title LIMIT 200'; $st=Database::connection()->prepare($sql);$st->execute($params); Response::json($st->fetchAll()); }
-  public static function show(array $p): void { $pdo=Database::connection(); $st=$pdo->prepare('SELECT b.*,a.name author,g.name genre FROM books b JOIN authors a ON a.id=b.author_id JOIN genres g ON g.id=b.genre_id WHERE b.id=?'); $st->execute([(int)$p['id']]); $book=$st->fetch(); if(!$book) Response::json(['error'=>'Livro não encontrado'],404); $stats=$pdo->prepare('SELECT status,COUNT(*) total,AVG(rating) avg_rating FROM user_books WHERE book_id=? GROUP BY status');$stats->execute([$p['id']]); $comments=$pdo->prepare('SELECT c.id,c.body,c.created_at,u.name,CONCAT("@",u.username) username FROM book_comments c JOIN users u ON u.id=c.user_id WHERE c.book_id=? ORDER BY c.created_at DESC LIMIT 50');$comments->execute([$p['id']]); Response::json(['book'=>$book,'stats'=>$stats->fetchAll(),'comments'=>$comments->fetchAll()]); }
-  public static function genres(): void { $st=Database::connection()->query('SELECT * FROM genres ORDER BY name'); Response::json($st->fetchAll()); }
-  public static function authors(): void { $st=Database::connection()->query('SELECT * FROM authors ORDER BY name'); Response::json($st->fetchAll()); }
-  public static function addToLibrary(array $p): void { $id=AuthMiddleware::userId(); $bookId=(int)$p['bookId']; $b=Request::body(); $status=$b['status']??'WANT_FUTURE'; if(!in_array($status,self::$statuses,true)) Response::json(['error'=>'Status inválido'],422); $pdo=Database::connection(); $order=(int)($b['display_order']??9999); $st=$pdo->prepare('INSERT INTO user_books(user_id,book_id,status,rating,notes,favorite,display_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE status=VALUES(status), rating=VALUES(rating), notes=VALUES(notes), favorite=VALUES(favorite), display_order=VALUES(display_order), updated_at=NOW()'); $st->execute([$id,$bookId,$status,$b['rating']??null,$b['notes']??null,!empty($b['favorite'])?1:0,$order]); Response::json(['message'=>'Livro salvo na biblioteca']); }
-  public static function updateUserBook(array $p): void { $id=AuthMiddleware::userId(); $bookId=(int)$p['bookId']; $b=Request::body(); $fields=[];$params=[]; foreach(['status','rating','notes','display_order'] as $f){ if(array_key_exists($f,$b)){ if($f==='status'&&!in_array($b[$f],self::$statuses,true)) Response::json(['error'=>'Status inválido'],422); $fields[]="$f=?"; $params[]=$b[$f]; }} if(array_key_exists('favorite',$b)){ $fields[]='favorite=?';$params[]=!empty($b['favorite'])?1:0;} if(!$fields) Response::json(['error'=>'Nada para atualizar'],422); $params[]=$id;$params[]=$bookId; $sql='UPDATE user_books SET '.implode(',',$fields).',updated_at=NOW() WHERE user_id=? AND book_id=?'; $st=Database::connection()->prepare($sql);$st->execute($params); Response::json(['message'=>'Livro atualizado']); }
-  public static function remove(array $p): void { $id=AuthMiddleware::userId(); $st=Database::connection()->prepare('DELETE FROM user_books WHERE user_id=? AND book_id=?');$st->execute([$id,(int)$p['bookId']]); Response::json(['message'=>'Livro removido']); }
-  public static function reorder(): void { $id=AuthMiddleware::userId(); $items=Request::body()['items']??[]; $pdo=Database::connection(); $pdo->beginTransaction(); $st=$pdo->prepare('UPDATE user_books SET display_order=?,updated_at=NOW() WHERE user_id=? AND book_id=?'); foreach($items as $i){$st->execute([(int)$i['display_order'],$id,(int)$i['book_id']]);} $pdo->commit(); Response::json(['message'=>'Ordem atualizada']); }
-  public static function comment(array $p): void { $id=AuthMiddleware::userId(); $body=trim(Request::body()['body']??''); if($body==='') Response::json(['error'=>'Comentário vazio'],422); $st=Database::connection()->prepare('INSERT INTO book_comments(user_id,book_id,body,created_at) VALUES(?,?,?,NOW())'); $st->execute([$id,(int)$p['bookId'],$body]); Response::json(['message'=>'Comentário publicado'],201); }
-  public static function create(): void { $id=AuthMiddleware::userId(); $b=Request::body(); foreach(['title','author_id','genre_id'] as $f) if(empty($b[$f])) Response::json(['error'=>"Campo obrigatório: $f"],422); $st=Database::connection()->prepare('INSERT INTO books(title,original_title,author_id,genre_id,year,language,pages,isbn,publisher,cover,description,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NOW())'); $st->execute([$b['title'],$b['original_title']??null,$b['author_id'],$b['genre_id'],$b['year']??null,$b['language']??null,$b['pages']??null,$b['isbn']??null,$b['publisher']??null,$b['cover']??null,$b['description']??null,$id]); Response::json(['message'=>'Livro criado','id'=>Database::connection()->lastInsertId()],201); }
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/login/jwt.php';
+class BookController {
+    public static function all(): void {
+        $q = '%' . trim($_GET['q'] ?? '') . '%';
+        $stmt = db()->prepare('SELECT b.*, a.name author, g.name genre FROM books b JOIN authors a ON a.id=b.author_id JOIN genres g ON g.id=b.genre_id WHERE b.title ILIKE ? OR a.name ILIKE ? OR g.name ILIKE ? ORDER BY g.name, a.name, b.title');
+        $stmt->execute([$q,$q,$q]);
+        json_response(['books'=>$stmt->fetchAll()]);
+    }
+    public static function addToLibrary(): void {
+        require_method('POST');
+        $userId = auth_user_id(); $d = input_json(); $bookId = (int)($d['book_id'] ?? 0);
+        $status = $d['status'] ?? 'WANT_FUTURE';
+        $valid = ['READ','READING','NEXT_READ','WANT_FUTURE','DUSTY','GIFT_ACCEPTED','ABANDONED','REREADING','WANT_SPECIAL_EDITION'];
+        if (!$bookId || !in_array($status, $valid, true)) json_response(['error'=>'Livro/status inválido.'],422);
+        $order = db()->prepare('SELECT COALESCE(MAX(display_order),0)+1 AS n FROM user_books WHERE user_id=?'); $order->execute([$userId]);
+        $n = (int)$order->fetch()['n'];
+        $stmt = db()->prepare('INSERT INTO user_books (user_id, book_id, status, display_order) VALUES (?,?,?,?) ON CONFLICT (user_id, book_id) DO UPDATE SET status=EXCLUDED.status, updated_at=now() RETURNING *');
+        $stmt->execute([$userId,$bookId,$status,$n]);
+        json_response(['userBook'=>$stmt->fetch()],201);
+    }
+    public static function updateUserBook(): void {
+        require_method('POST');
+        $userId = auth_user_id(); $d = input_json(); $bookId=(int)($d['book_id']??0);
+        $fields=[]; $params=[];
+        foreach(['status','rating','notes','favorite','display_order'] as $f){ if(array_key_exists($f,$d)){ $fields[]="$f=?"; $params[]=$d[$f]; }}
+        if(!$bookId || !$fields) json_response(['error'=>'Nada para atualizar.'],422);
+        $params[]=$userId; $params[]=$bookId;
+        $sql='UPDATE user_books SET '.implode(',',$fields).', updated_at=now() WHERE user_id=? AND book_id=? RETURNING *';
+        $stmt=db()->prepare($sql); $stmt->execute($params); json_response(['userBook'=>$stmt->fetch()]);
+    }
+    public static function comments(): void {
+        require_method('POST');
+        $userId=auth_user_id(); $d=input_json(); $bookId=(int)($d['book_id']??0); $body=trim($d['body']??'');
+        if(!$bookId||!$body) json_response(['error'=>'Comentário inválido.'],422);
+        $stmt=db()->prepare('INSERT INTO book_comments(user_id,book_id,body) VALUES(?,?,?) RETURNING *'); $stmt->execute([$userId,$bookId,$body]); json_response(['comment'=>$stmt->fetch()],201);
+    }
 }
