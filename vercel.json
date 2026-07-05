@@ -5,10 +5,9 @@
     }
   },
   "routes": [
-    { "src": "/css/(.*)", "dest": "/public/css/$1" },
-    { "src": "/js/(.*)", "dest": "/public/js/$1" },
-    { "src": "/img/(.*)", "dest": "/public/img/$1" },
-    { "src": "/favicon.ico", "dest": "/public/favicon.ico" },
+    { "src": "/css/(.*)", "dest": "/api/css/$1" },
+    { "src": "/js/(.*)", "dest": "/api/js/$1" },
+    { "src": "/img/(.*)", "dest": "/api/img/$1" },
     { "src": "/", "dest": "/api/index.php" },
     { "src": "/(.*\\.php)", "dest": "/api/$1" }
   ]
